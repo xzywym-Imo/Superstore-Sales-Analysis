@@ -70,9 +70,12 @@ Insight:
 
 (Overall and also broken down by year)
 
-<img width="1344" height="960" alt="unnamed-chunk-15-1" src="https://github.com/user-attachments/assets/2fda43fd-c40e-473f-9838-4134c4454bcf" />
 
+<img width="1344" height="960" alt="Top_5_Sub-Categories_Driving_Sales_in_March_2017-1" src="https://github.com/user-attachments/assets/883fc650-d8d5-48c6-8576-878a3b451856" />
 
+<img width="1344" height="960" alt="Top_5_Sub-Categories_Driving_Sales_in_November_2017-1" src="https://github.com/user-attachments/assets/555ce73b-3322-4124-95ce-701b54f244a1" />
+
+<img width="1344" height="960" alt="Top_5_Sub-Categories_Driving_Sales_in_December_2017-1" src="https://github.com/user-attachments/assets/f4cbe747-2709-48b5-b49b-980d277dbf87" />
 
 
 Insight:
@@ -83,17 +86,13 @@ Furniture occasionally appears (Chairs, Tables), but Technology remains stronges
 
 Product focus in March should prioritize high-demand Tech SKUs.
 
-## 📉 3. Discount Impact on Profit
-Insight:
 
-Increasing discounts lead to declining profit, often becoming negative past 40%.
-
-Many highly discounted orders are unprofitable.
-
-Recommendation:
-→ Limit discounts on low-margin categories and optimize pricing strategy.
 
 ## 💸 4. Profitability by Product Sub-Category
+
+<img width="1344" height="960" alt="unnamed-chunk-17-1" src="https://github.com/user-attachments/assets/d5f8a397-ea6b-40db-a53f-f94a4d6f9388" />
+
+
 Insight:
 
 Top profit generators:
@@ -115,7 +114,11 @@ Supplies
 Recommendation:
 Reevaluate pricing, shipping cost structure, or discontinue chronically unprofitable products.
 
+
 ## 📊 5. Profit Margin Distribution
+
+<img width="1344" height="960" alt="Distribution_of_Profit_Margin_per_Order-1" src="https://github.com/user-attachments/assets/30021f4b-3bdb-499a-aa96-842f79e0ec49" />
+
 Insight:
 
 Most orders cluster around 0–20% margin range, with heavy right skew.
@@ -125,6 +128,9 @@ Several orders have extremely negative margins, indicating operational inefficie
 Mean profit margin ≈ 12%.
 
 ## 🌎 6. Profit by Region (with Margin %)
+
+<img width="1344" height="960" alt="unnamed-chunk-24-1" src="https://github.com/user-attachments/assets/f1f301bf-0017-4a37-a7ee-849072ce1fc2" />
+
 Insight:
 Region	Profit	Margin
 West	Highest	14.9%
@@ -136,6 +142,10 @@ Recommendation:
 Investigate the Central region for high shipping costs, low-margin customers, or unprofitable products.
 
 ## 👥 7. Profit by Customer Segment (with Margin %)
+
+
+<img width="1344" height="960" alt="unnamed-chunk-27-1" src="https://github.com/user-attachments/assets/e66c44fd-98b5-406b-a040-3d3ee1616948" />
+
 Insight:
 Segment	Profit	Margin
 Consumer	Highest revenue	11.5% margin
@@ -147,8 +157,11 @@ The Home Office segment is smaller but more profitable per order.
 Opportunity: Explore targeted promotions to grow this high-margin segment.
 
 ## 📈 8. Sales vs. Profit Relationship
-Insight:
 
+<img width="1344" height="960" alt="unnamed-chunk-16-1" src="https://github.com/user-attachments/assets/ec2767c1-cdfe-4691-b465-4cd894a834f3" />
+<img width="1344" height="960" alt="unnamed-chunk-17-1" src="https://github.com/user-attachments/assets/0aba3df9-6735-484b-9680-97bb86603cc4" />
+
+Insight:
 A weak positive correlation:
 Higher sales generally lead to higher profit, but with large variance.
 

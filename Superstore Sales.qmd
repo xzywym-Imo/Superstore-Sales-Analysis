@@ -1,0 +1,729 @@
+---
+title: "Superstore sales"
+format: html
+---
+
+# Project Overview
+
+**Goal:** Analyze a retail Superstore dataset to find key business insights — e.g.
+
+-   What categories or regions drive profit?
+
+-   Which products or customers cause losses?
+
+-   How can we improve sales performance?
+
+**Project Scope**
+
+This project will focus on several key analytical areas using the Superstore dataset. You may start with any 3–4 of the following:
+
+1\. Sales Performance
+
+-   Identify the **top 10 products** by both *sales* and *profit*.
+-   Determine which **regions**, **states**, or **customer segments** perform best.
+
+2\. Profitability Analysis
+
+-   Explore whether **higher discount rates reduce profit**.
+-   Identify **product categories or sub-categories** with low profit margins.
+
+3\. Customer Behavior
+
+-   Determine which **customer segment spends the most on average**.
+-   Investigate the relationship between **order frequency** and **profitability**.
+
+4\. Trend Forecasting *(Optional)*
+
+-   Analyze how **monthly sales vary over time**.
+-   Attempt to **forecast next month’s revenue** using time-series methods.
+
+# Data Prep
+
+```{r}
+library(tidyverse)
+library(scales)
+library(tidytext)
+```
+
+# Data cleaning
+
+```{r}
+# Convert Order Date and Ship Date to Date type
+superstore <- read_csv('Sample - Superstore.csv')
+superstore <- superstore %>% 
+  mutate(`Order Date` = mdy(`Order Date`),
+         `Ship Date` = mdy(`Ship Date`)) %>% 
+  mutate(Year = year(`Order Date`),
+         Month = month(`Order Date`))
+```
+
+```{r}
+# check missing value of each column
+colSums(is.na(superstore))
+
+# check duplicates
+sum(duplicated(superstore))
+
+
+summary(superstore)
+```
+
+# EDA
+
+## **Univariate** Analysis
+
+## - Unordered Categorical
+
+#### Country, State, City and Region
+
+```{r}
+unique(superstore$Country)
+unique(superstore$State)
+unique(superstore$City)
+unique(superstore$Region)
+
+# Top 10 count State (useless because no meaning)
+superstore %>% 
+  group_by(State) %>% 
+  summarise(Count = n()) %>% 
+  slice_max(Count, n = 10) %>% 
+  ggplot(aes(reorder(State, Count), y = Count)) +
+  geom_col() + coord_flip()
+```
+
+#### Category, sub category
+
+```{r}
+unique(superstore$Category)
+superstore %>% 
+  distinct(Category, `Sub-Category`) %>% 
+  arrange(Category)
+
+```
+
+#### segment
+
+```{r}
+unique(superstore$Segment)
+```
+
+## - Ordered categorical
+
+#### Ship Mode
+
+```{r}
+unique(superstore$`Ship Mode`)
+superstore %>% 
+  count(`Ship Mode`) %>% 
+  ggplot(aes(x = `Ship Mode`, y = n)) +
+  geom_col()
+```
+
+## - Quantitative variables
+
+```{r}
+summary(superstore$`Order Date`)
+summary(superstore$`Ship Date`)
+```
+
+# 1️⃣ Sales Performance
+
+### Monthly Sales Trend
+
+```{r}
+superstore %>% 
+  mutate(Month = month(`Order Date`)) %>%
+  group_by(Month) %>% 
+  summarise(total_sales = sum(Sales)) %>% 
+  ggplot(aes(x = factor(Month), y = total_sales)) + 
+  geom_col() +
+  labs(
+    title = "Aggregate Monthly Sales Trend from 2014 - 2017 ",
+    x = "Month",
+    y = "Total Sales ($)")
+```
+
+```{r Monthly_Sales_Pattern_2014-2017}
+superstore %>%
+  group_by(Month) %>%
+  summarise(total_sales = sum(Sales)) %>%
+  ggplot(aes(x = Month, y = total_sales)) +
+  geom_col(fill = "#4a7ebb") +                # better color
+  geom_smooth(method = "loess", se = FALSE, 
+              color = "darkred", size = 1.2) +
+  scale_x_continuous(breaks = 1:12,
+                     labels = month.abb) +  # Jan Feb ... Dec
+  scale_y_continuous(labels = scales::dollar) +
+  labs(
+    title = "Monthly Sales Pattern (2014–2017 Combined)",
+    x = "Month",
+    y = "Total Sales ($)"
+  ) +
+  theme_minimal(base_size = 10) +             # cleaner theme
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+
+```
+
+-   Sales heavily affected by Holiday season (Sep, Nov, Dec). Q4 is the is the most critical revenue period.
+
+    -   Marketing, inventory, and logistics teams must prepare early for demand spikes.
+
+-   March sales jump significantly after Feburary
+
+    -   maybe: Businesses finalizing Q1 budget, Renewed purchasing after slow February.
+
+    -   Timing marketing campaigns in late February could capture this early upswing.
+
+    **Dive deep to see March !!!**
+
+```{r}
+# March sales for each year
+superstore %>%
+  mutate(Month = month(`Order Date`),
+         Year = year(`Order Date`)) %>%
+  group_by(Year) %>%
+  filter(Month == 3) %>% 
+  summarise(mar_sales = sum(Sales)) %>% 
+  ggplot(aes(x = Year, y = mar_sales)) + geom_col()
+```
+
+```{r Monthly_Sales_Trend_by_Year}
+
+superstore %>%
+  group_by(Year, Month) %>%
+  summarise(total_sales = sum(Sales), .groups = "drop") %>%
+  ggplot(aes(x = Month, y = total_sales, color = as.factor(Year))) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = "Monthly Sales Trend by Year (2014–2017)",
+    x = "Month",
+    y = "Total Sales ($)",
+    color = "Year"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "right"
+  )
+```
+
+**All previous years shows a jump in March, what category drive the sales?**
+
+### Sales by Category and Subcategory
+
+```{r}
+superstore %>%
+  group_by(Category, `Sub-Category`) %>%
+  summarise(Sales = sum(Sales), .groups = "drop") %>% 
+  ggplot(aes(x = reorder(`Sub-Category`, Sales), y = Sales, fill = Category)) +
+  geom_col(show.legend = TRUE) +
+  coord_flip() +
+  labs(
+    title = "Sales by Product Sub-Category",
+    x = "",
+    y = "Sales ($)"
+  ) +
+  scale_y_continuous(labels = dollar)
+  
+
+```
+
+```{r}
+
+superstore %>%
+  mutate(
+    Month = month(`Order Date`),
+    Category = as.factor(Category)
+  ) %>%
+  group_by(Category, Month) %>%
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  ggplot(aes(x = Month, y = Total_Sales, color = Category)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_y_continuous(labels = dollar) +
+  labs(
+    title = "Monthly Sales by Category (2014–2017 Combined)",
+    x = "Month",
+    y = "Total Sales ($)",
+    color = "Category"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+
+```
+
+We observe **Technology** is the key driver of March Sales\
+
+```{r Top_5_Sub-Categories_Driving_Sales_in_March_2017}
+t.sales.mar <- superstore %>%
+  filter(Month == 3, Year == 2017) %>%
+  summarise(Tsales = sum(Sales)) %>% 
+  pull
+superstore %>%
+  filter(Month == 3, Year == 2017) %>%          
+  group_by(Category, `Sub-Category`) %>%                   # IMPORTANT
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  mutate(Pct_of_March = Total_Sales / t.sales.mar) %>%  
+  arrange(desc(Total_Sales)) %>% 
+  slice_max(Total_Sales, n = 5) %>%                 # top 5 sub-categories
+  mutate(`Sub-Category` = reorder(`Sub-Category`, Pct_of_March)) %>%
+  ggplot(aes(x = `Sub-Category`, y = Pct_of_March, fill = Category)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 5 Sub-Categories Driving Sales in March 2017",
+    x = "",
+    y = "% Total Sales in March",
+    fill = "Category"
+  ) +
+  scale_y_continuous(labels = percent) +
+  theme_minimal(base_size = 13)
+
+```
+
+```{r}
+march_pct <- superstore %>%
+  mutate(Month = month(`Order Date`)) %>%
+  filter(Month == 3) %>%                                       # only March
+  group_by(Category, `Sub-Category`) %>%
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>% 
+  
+  arrange(desc(Total_Sales)) %>%
+  slice_max(Total_Sales, n = 5) %>%                           # top 5 sub-categories
+  mutate(
+    Pct_of_March = Total_Sales / sum(Total_Sales)             # percentage
+  )
+
+march_pct %>% 
+  mutate(`Sub-Category` = reorder(`Sub-Category`, Pct_of_March)) %>%
+  ggplot(aes(x = `Sub-Category`, y = Pct_of_March, fill = Category)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Percentage Contribution to March Sales (Top 5 Sub-Categories)",
+    x = "",
+    y = "Percent of Total March Sales"
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+-   Machines, Phones, and Copiers — all Technology sub-categories — account for **over 65% of total March sales**.
+
+    -   📌 **Strategic insight:** March is a Tech-driven month. Corporate or operational tech purchasing likely spikes in Q1, suggesting strong B2B demand.
+
+-   Machines and Phones are the key revenue drivers in early Q1.
+
+    -   📌 **Business implication:**
+
+        -   Marketing campaigns targeting these product lines in late February–March could significantly lift total revenue.
+
+        -   Inventory must be positioned to support high demand specifically for Tech items.
+
+-   Chairs and Tables perform moderately (\~15–20% each), indicating mixed office-setup demand.
+
+    -   📌 **Interpretation:** This may reflect businesses expanding teams or making smaller office upgrades, but not at the same intensity as tech purchases.
+
+```{r}
+# Top 5 Sub-Categories in March — For Each Year
+top5_march_year <- superstore %>%
+  filter(Month == 3) %>%                                 # March only
+  group_by(Year, Category, `Sub-Category`) %>%
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  arrange(Year, desc(Total_Sales)) %>%
+  group_by(Year) %>%                                     # select top 5 per year
+  slice_max(Total_Sales, n = 5) %>%
+  ungroup() %>%
+  mutate(`Sub-Category` = reorder_within(`Sub-Category`, Total_Sales, Year))
+top5_march_year
+
+  # plot
+ ggplot(top5_march_year,
+       aes(x = `Sub-Category`, y = Total_Sales, fill = Category)) +
+  geom_col() +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_y_continuous(labels = dollar) +
+  labs(
+    title = "Top 5 Sub-Categories Driving March Sales (By Year)",
+    x = "",
+    y = "Total Sales ($)",
+    fill = "Category"
+  ) +
+  facet_wrap(~Year, scales = "free_y") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+
+```
+
+```{r}
+t.sales.sep <- superstore %>%
+  filter(Month == 9, Year == 2017) %>%
+  summarise(Tsales = sum(Sales)) %>% 
+  pull
+superstore %>%
+  filter(Month == 9, Year == 2017) %>%          
+  group_by(Category, `Sub-Category`) %>%                   # IMPORTANT
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  mutate(Pct_of_nov = Total_Sales / t.sales.sep) %>%  
+  arrange(desc(Total_Sales)) %>% 
+  slice_max(Total_Sales, n = 5) %>%                 # top 5 sub-categories
+  mutate(`Sub-Category` = reorder(`Sub-Category`, Pct_of_nov)) %>%
+  ggplot(aes(x = `Sub-Category`, y = Pct_of_nov, fill = Category)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 5 Sub-Categories Driving Sales in September 2017",
+    x = "",
+    y = "% Total Sales in September",
+    fill = "Category"
+  ) +
+  scale_y_continuous(labels = percent) +
+  theme_minimal(base_size = 13)
+```
+
+```{r Top_5_Sub-Categories_Driving_Sales_in_November_2017}
+# Top 5 Sub-Categories Driving Sales in November
+t.sales.nov <- superstore %>%
+  filter(Month == 11, Year == 2017) %>%
+  summarise(Tsales = sum(Sales)) %>% 
+  pull
+superstore %>%
+  filter(Month == 11, Year == 2017) %>%          
+  group_by(Category, `Sub-Category`) %>%                   # IMPORTANT
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  mutate(Pct_of_nov = Total_Sales / t.sales.nov) %>%  
+  arrange(desc(Total_Sales)) %>% 
+  slice_max(Total_Sales, n = 5) %>%                 # top 5 sub-categories
+  mutate(`Sub-Category` = reorder(`Sub-Category`, Pct_of_nov)) %>%
+  ggplot(aes(x = `Sub-Category`, y = Pct_of_nov, fill = Category)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 5 Sub-Categories Driving Sales in November 2017",
+    x = "",
+    y = "% Total Sales in November",
+    fill = "Category"
+  ) +
+  scale_y_continuous(labels = percent) +
+  theme_minimal(base_size = 13)
+
+
+```
+
+```{r Top_5_Sub-Categories_Driving_Sales_in_December_2017}
+t.sales.dec <- superstore %>%
+  filter(Month == 12, Year == 2017) %>%
+  summarise(Tsales = sum(Sales)) %>% 
+  pull
+superstore %>%
+  filter(Month == 12, Year == 2017) %>%          
+  group_by(Category, `Sub-Category`) %>%                   # IMPORTANT
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  mutate(Pct_of_nov = Total_Sales / t.sales.nov) %>%  
+  arrange(desc(Total_Sales)) %>% 
+  slice_max(Total_Sales, n = 5) %>%                 # top 5 sub-categories
+  mutate(`Sub-Category` = reorder(`Sub-Category`, Pct_of_nov)) %>%
+  ggplot(aes(x = `Sub-Category`, y = Pct_of_nov, fill = Category)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 5 Sub-Categories Driving Sales in December 2017",
+    x = "",
+    y = "% Total Sales in December",
+    fill = "Category"
+  ) +
+  scale_y_continuous(labels = percent) +
+  theme_minimal(base_size = 13)
+
+```
+
+```{r}
+
+superstore %>%
+  mutate(
+    Month = month(`Order Date`),
+    Month = factor(Month, levels = 1:12, labels = month.abb)
+  ) %>%
+  group_by(`Sub-Category`, Month) %>%
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  ggplot(aes(x = Month, y = `Sub-Category`, fill = Total_Sales)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", labels = dollar) +
+  labs(
+    title = "Monthly Sales Heatmap by Sub-Category",
+    x = "Month",
+    y = "Sub-Category",
+    fill = "Sales ($)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.y = element_text(size = 10)
+  )
+```
+
+# 2️⃣ Profitability Analysis
+
+### Profit vs Sales Relationship
+
+```{r}
+
+superstore %>%
+  ggplot(aes(x = Sales, y = Profit)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(
+    title = "Relationship between Sales and Profit",
+    x = "Sales ($)",
+    y = "Profit ($)"
+  ) +
+  scale_x_continuous(labels = dollar) +
+  scale_y_continuous(labels = dollar)
+```
+
+-   Sales and Profit have a weak positive relationship, not direct correlated.
+
+### Profitability by Category and Subcategory
+
+```{r Profitability_by_Category_and_Subcategory}
+subcategory_profit <- superstore %>%
+  group_by(Category, `Sub-Category`) %>%
+  summarise(
+    Total_Profit = sum(Profit),
+    Profit_Margin = mean(Profit / Sales),
+    .groups = "drop"
+  )
+
+ggplot(subcategory_profit, aes(x = reorder(`Sub-Category`, Total_Profit), y = Total_Profit, fill = Category)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Profit by Product Sub-Category", x = "", y = "Profit ($)") +
+  scale_y_continuous(labels = dollar)
+```
+
+-   top 3 profit all comes from Technology, they generate \$30,000–\$50,000+ in profit
+
+-   All technology shows a positive mean profit, [can receive priority in (]{.underline} inventory allocation, marketing campaigns, sales strategy, promotional resources)
+
+-   Office Supplies provide steady, mid-range profitability. These products are **low-risk, stable contributors** to profit.
+
+-   Several Furniture sub-categories show **negative profit,** including bookcases and tables. Tables has the biggest negative profit with -\$17000.
+
+-   “Machines” appears with **very low or even slightly negative profit**, despite being high-sales items. (may need a **pricing or discount policy review**.)
+
+-   The company is relying too heavily on a small number of profitable sub-categories.\
+    This creates **financial risk** if demand for these products falls. ([**DIVE DEEPER BELOW**]{.underline})
+
+    ### Profit Margin Distribution
+
+```{r Distribution_of_Profit_Margin_per_Order}
+sup_profit_analysis <- superstore %>% 
+  filter(Year == 2017) %>% 
+  mutate(Profit_Margin = Profit / Sales)
+mean_pm <- mean(sup_profit_analysis$Profit_Margin, na.rm = TRUE)
+ggplot(sup_profit_analysis, aes(x = Profit_Margin)) +
+  geom_histogram(fill = "skyblue", bins = 50) +
+  geom_vline(aes(xintercept = mean_pm), color = "red", linetype = "dashed") +
+  labs(title = "Distribution of Profit Margin per Order", 
+       x = "Profit Margin", y = "Frequency") + 
+  annotate("text",
+           x = mean_pm,
+           y = 1500,            # adjust if needed
+           label = "Mean",
+           color = "red",
+           angle = 90,
+           vjust = -0.5,
+           fontface = "bold") +
+  scale_x_continuous(labels = percent) +
+  theme_minimal(base_size = 13)
+```
+
+### Discount vs Profit Analysis
+
+```{r}
+ggplot(superstore, aes(x = Discount, y = Profit)) +
+  geom_point(alpha = 0.4, color = "darkorange") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(
+    title = "Impact of Discount on Profit",
+    x = "Discount Rate",
+    y = "Profit ($)"
+  )
+
+```
+
+### Profit by Region
+
+```{r}
+region_profit <- superstore %>%
+  group_by(Region) %>%
+  summarise(
+    Total_Sales = sum(Sales),
+    Total_Profit = sum(Profit),
+    Profit_Margin = sum(Profit) / sum(Sales)
+  )
+
+ggplot(region_profit, aes(x = reorder(Region, -Total_Profit), y = Total_Profit, fill = Region)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(round(Profit_Margin*100, 1), "%")), vjust = -0.5) +
+  labs(title = "Profit by Region (with Margin %)", x = "Region", y = "Profit ($)") +
+  scale_y_continuous(labels = dollar)
+
+```
+
+Profit by Region – Key Insights
+
+The West Region Is the Profit Engine
+The West has the highest total profit and the highest profit margin at 14.9 percent. This indicates that the West not only generates strong sales but does so efficiently. Factors contributing to this may include stronger pricing, better product mix, or lower discounting compared to other regions.
+Business implication: The West is performing exceptionally well. Strategies used in this region may be worth expanding to other regions.
+
+The East Region Is Strong but Less Efficient
+The East shows the second-highest total profit and a profit margin of 13.5 percent. While its sales performance is strong, the slightly lower margin compared to the West suggests the possibility of higher discounts or a heavier mix of lower-margin products.
+Business implication: The East is a healthy market, but optimizing discount strategy or adjusting product mix could improve its profitability further.
+
+South Region: Moderate Profit, Lower Efficiency
+The South has noticeably lower profit and a lower margin of 11.9 percent. This region may be experiencing higher operational costs, heavier discounting, or weaker demand for high-margin categories.
+Business implication: The South requires closer examination of discount patterns, shipping costs, and category performance.
+
+Central Region: Lowest Profit and Lowest Margin
+The Central region produces the lowest profit and has the lowest margin at 7.9 percent, which is roughly half the margin of the West. This underperformance may be caused by aggressive discounting, high returns, a weak product mix, or higher operational costs.
+Business implication: The Central region is a priority area for improvement. Potential actions include reviewing pricing, reducing excessive discounting, optimizing product assortment, and investigating operational inefficiencies.
+
+Overall Takeaways
+West is the strongest region in both profit and efficiency.
+East performs well but has room for margin improvement.
+South is average and needs further evaluation.
+Central is the weakest region and represents an opportunity for strategic improvement.
+
+### Profitability by Segment
+
+```{r}
+segment_profit <- superstore %>%
+  group_by(Segment) %>%
+  summarise(
+    Sales = sum(Sales),
+    Profit = sum(Profit),
+    Profit_Margin = sum(Profit) / sum(Sales)
+  )
+
+ggplot(segment_profit, aes(x = Segment, y = Profit, fill = Segment)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(round(Profit_Margin*100, 1), "%")), vjust = -0.5) +
+  labs(title = "Profit by Customer Segment (with Margin %)", x = "", y = "Profit ($)") +
+  scale_y_continuous(labels = dollar)
+
+```
+
+The chart compares total profit and profit margin across the three customer segments: Consumer, Corporate, and Home Office.
+
+- The Consumer segment generates the highest total profit, despite having the lowest profit margin at 11.5 percent. This suggests that the Consumer segment has high sales volume, which compensates for its lower profit efficiency.
+
+- The Corporate segment shows a moderate level of total profit with a margin of 13 percent. This indicates a balanced performance, where both sales volume and pricing efficiency contribute to profitability.
+
+- The Home Office segment has the lowest total profit but the highest profit margin at 14 percent. This implies that although the segment is smaller in scale, it is more efficient in turning sales into profit, likely due to better pricing or lower discounting.
+
+Overall, Consumers drive the most total profit due to scale, while Home Office customers contribute the highest profit percentage per dollar sold. Corporate customers fall in the middle, demonstrating steady and efficient profitability.
+
+# 3️⃣ Marching learning
+
+## Goal
+
+Predict whether an order will be **profitable or unprofitable** before it is completed.
+
+*“Should we allow this discount / order?”*
+
+```{r}
+ml_data <- superstore %>%
+  mutate(
+    Profitable = ifelse(Profit > 0, 1, 0)) %>% 
+  select(
+    Profitable,
+    Sales,
+    Discount,
+    Quantity,
+    Category,
+    Segment,
+    Region,
+    `Ship Mode`) %>% drop_na() %>% 
+  mutate(
+    Category  = as.factor(Category),
+    Segment   = as.factor(Segment),
+    Region    = as.factor(Region),
+    `Ship Mode` = as.factor(`Ship Mode`)
+  )
+```
+
+```{r}
+set.seed(123)
+
+train_index <- sample(
+  seq_len(nrow(ml_data)),
+  size = 0.8 * nrow(ml_data))
+
+train_data <- ml_data[train_index, ]
+test_data  <- ml_data[-train_index, ]
+
+```
+
+```{r}
+profit_model <- glm(
+  Profitable ~ Sales + Discount + Quantity +
+    Category + Segment + Region + `Ship Mode`,
+  data = train_data,
+  family = binomial)
+summary(profit_model)
+```
+
+```{r}
+profit_model.1 <- update(profit_model, .~. - Sales - Segment - `Ship Mode`)
+summary(profit_model.1)
+
+# Discount is the strongest negative predictor of profitability.
+```
+
+```{r}
+test_data <- test_data %>%
+  mutate(
+    Predicted_Prob = predict(profit_model, test_data, type = "response"),
+    Predicted_Class = ifelse(Predicted_Prob > 0.5, 1, 0))
+table(
+  Actual = test_data$Profitable,
+  Predicted = test_data$Predicted_Class)
+mean(test_data$Profitable == test_data$Predicted_Class)
+```
+
+# 📌 Summary of Business Recommendations
+
+✅ Focus inventory and marketing on high-profit items:
+
+Copiers, Phones, Accessories
+
+❗ Reduce loss-making categories:
+
+Tables, Bookcases, Supplies
+
+📍 Address regional underperformance:
+
+Investigate Central region cost structure
+
+🎯 Strengthen pricing strategy:
+
+Avoid unnecessary deep discounts
+
+Optimize pricing for low-margin products
+
+💼 Customer Strategy:
+
+Expand the high-margin Home Office segment
+
+Maintain strong Corporate relationships

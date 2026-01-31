@@ -18,9 +18,19 @@ This project analyzes the widely used Superstore dataset to uncover key business
   - Should we allow this order or discount? (Logistic Regression)
 
 
-
+# Tools & Skills Used
 This project demonstrates strong analytical skills across R, dplyr, ggplot2, EDA, data cleaning, visualization, trend analysis, and business interpretation.
 
+
+Languages: 	R, tidyverse, ggplot2 
+
+Data Manipulation: 	dplyr, lubridate, stringr 
+
+Visualization:	ggplot2, faceted plots, histograms, bar/line charts 
+
+Business Analytics:	Profitability, segmentation, time series patterns 
+
+Statistics: Margins, correlations, linear modeling, logistic regression
 
 
 # 📊 Key Insights & Visualizations
